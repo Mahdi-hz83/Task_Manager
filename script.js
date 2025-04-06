@@ -172,4 +172,8 @@ function startEditing(id) {
     document.getElementById("task-modal").classList.remove("hidden");
 }
 
+document.getElementById("cancel-form").addEventListener("click", () => {
+    document.getElementById("task-modal").classList.add("hidden");
+});
+
 loadTasks();
