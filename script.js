@@ -27,15 +27,14 @@ function displayTasks(tasks) {
     const selectedPriority = document.getElementById("filter-priority").value;
     const selectedStatus = document.getElementById("filter-status").value;
 
-    
     const filtered = tasks.filter(task => {
-        const searchMatch = task.title.toLowerCase().includes(keyword) || task.description.toLowerCase().includes(keyword);
+        const searchMatch = task.title.toLowerCase().includes(keyword) || 
+                         task.description.toLowerCase().includes(keyword);
         const priorityMatch = selectedPriority ? task.priority.toLowerCase() === selectedPriority : true;
         const statusMatch = selectedStatus ? task.status === selectedStatus : true;
         return searchMatch && priorityMatch && statusMatch;
     });
 
-    
     filtered.forEach(task => {
         const item = buildTaskItem(task);
         switch (task.status) {
@@ -58,24 +57,36 @@ function displayTasks(tasks) {
 // Create task
 function buildTaskItem(task) {
     const item = document.createElement("li");
-    item.className = "task-item p-3 rounded-lg shadow-md cursor-pointer transition duration-300";
-    item.draggable = true;
+    
+    const borderColor = task.priority.toLowerCase() === "low" ? "border-l-green-500" :
+                       task.priority.toLowerCase() === "medium" ? "border-l-yellow-500" :
+                       "border-l-red-500";
+
+    const priorityTextColor = task.priority.toLowerCase() === "low" ? "text-green-500" :
+                             task.priority.toLowerCase() === "medium" ? "text-yellow-500" :
+                             "text-red-500";
+
+    item.className = `task-card bg-white p-3 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border-l-4 ${borderColor} mb-2 cursor-pointer`;    item.draggable = true;
     item.dataset.taskId = task.id;
 
-    const tagColor = task.priority.toLowerCase() === "low" ? "bg-green-500" :
-                     task.priority.toLowerCase() === "medium" ? "bg-yellow-500" :
-                     "bg-red-500";
-
     item.innerHTML = `
-        <h4 class="font-bold">${task.title} <span class="text-xs ${tagColor} text-white px-2 py-1 rounded">${task.priority}</span></h4>
-        <p class="text-xs opacity-75">Due: ${new Date(task.dueDate * 1000).toLocaleDateString()}</p>
+        <div class="flex justify-between items-start">
+            <h3 class="font-medium">${task.title}</h3>
+            <span class="text-sm ${priorityTextColor}">${task.priority}</span>
+        </div>
+        <p class="text-sm text-gray-600 mt-1">${task.description}</p>
+        <div class="mt-2 text-xs text-gray-500">Due: ${new Date(task.dueDate * 1000).toLocaleDateString()}</div>
         <div class="mt-2 flex gap-2">
-            <button onclick="startEditing('${task.id}')" class="text-xs bg-blue-500 text-white px-2 py-1 rounded">Edit</button>
-            <button onclick="removeTask('${task.id}')" class="text-xs bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+            <button onclick="startEditing('${task.id}')" class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition">Edit</button>
+            <button onclick="removeTask('${task.id}')" class="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition">Delete</button>
         </div>
     `;
 
-    item.addEventListener("click", () => showTaskDetails(task));
+    item.addEventListener("click", (e) => {
+        if (!e.target.tagName === 'BUTTON') {
+            showTaskDetails(task);
+        }
+    });
     item.addEventListener("dragstart", () => item.classList.add("dragging"));
     item.addEventListener("dragend", () => item.classList.remove("dragging"));
 
@@ -88,12 +99,7 @@ function buildTaskItem(task) {
     document.getElementById(id).addEventListener("change", () => displayTasks(taskList));
 });
 
-
-window.addEventListener("scroll", () => {
-    const addBtn = document.getElementById("add-task-btn");
-    window.scrollY > 200 ? addBtn.classList.remove("hidden") : addBtn.classList.add("hidden");
-});
-
+// Add task button
 document.getElementById("add-task-btn").addEventListener("click", () => {
     document.getElementById("task-form").reset();
     document.getElementById("task-form").dataset.taskId = "";
@@ -101,11 +107,12 @@ document.getElementById("add-task-btn").addEventListener("click", () => {
     document.getElementById("task-modal").classList.remove("hidden");
 });
 
+
 document.getElementById("close-modal").addEventListener("click", () => {
     document.getElementById("task-modal").classList.add("hidden");
 });
 
-// Submit form (create or update task)
+// Submit form
 document.getElementById("task-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -119,29 +126,36 @@ document.getElementById("task-form").addEventListener("submit", async (e) => {
         status: document.getElementById("task-status").value,
     };
 
-    if (taskId) {
-        await fetch(`${endpoint}/${taskId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-        });
-    } else {
-        await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-        });
+    try {
+        if (taskId) {
+            await fetch(`${endpoint}/${taskId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+        } else {
+            await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+        }
+        document.getElementById("task-modal").classList.add("hidden");
+        loadTasks();
+    } catch (err) {
+        console.error("Failed to save task:", err);
     }
-
-    document.getElementById("task-modal").classList.add("hidden");
-    loadTasks();
 });
 
 // Delete task
 async function removeTask(id) {
     if (confirm("Delete this task permanently?")) {
-        await fetch(`${endpoint}/${id}`, { method: "DELETE" });
-        loadTasks();
+        try {
+            await fetch(`${endpoint}/${id}`, { method: "DELETE" });
+            loadTasks();
+        } catch (err) {
+            console.error("Failed to delete task:", err);
+        }
     }
 }
 
@@ -158,9 +172,4 @@ function startEditing(id) {
     document.getElementById("task-modal").classList.remove("hidden");
 }
 
-document.querySelectorAll(".task-list").forEach(col => {
-    col.style.maxHeight = "300px";
-    col.style.overflowY = "auto";
-});
-
-loadTasks();  
+loadTasks();
